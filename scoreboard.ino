@@ -1,5 +1,6 @@
 #include <Adafruit_GFX.h>   // Core graphics library
 #include <RGBmatrixPanel.h> // Hardware-specific library
+#include <Bounce2.h>        // Button Debouncer
 
 // Similar to F(), but for PROGMEM string pointers rather than literals
 #define F2(progmem_ptr) (const __FlashStringHelper *)progmem_ptr
@@ -11,66 +12,96 @@
 #define A   A0
 #define B   A1
 #define C   A2
-RGBmatrixPanel matrix(A, B, C, CLK, LAT, OE, true);
+RGBmatrixPanel matrix(A, B, C, CLK, LAT, OE, false);
 
-// Button input pins
-const int homeAddButton = 2;
-const int homeSubButton = 3;
-const int awayAddButton = 4;
-const int awaySubButton = 5;
+
+#define BUTTON_PIN_1 10
+#define BUTTON_PIN_2 11
+#define BUTTON_PIN_3 12
+#define BUTTON_PIN_4 13
+
+Bounce debouncer1 = Bounce(); 
+Bounce debouncer2 = Bounce(); 
+Bounce debouncer3 = Bounce(); 
+Bounce debouncer4 = Bounce();
 
 // Program variables
-const char str[] PROGMEM = "Cornhole-io";
-int    textX   = matrix.width(),
-       textMin = sizeof(str) * -12,
-       textHue = 0;
        
 const int WINNING_SCORE = 21;
 int homeScore = 0;
 int awayScore = 0;
+bool updateDisplay = true;
 
 /****************************************
  * Program Setup
  ****************************************/
 void setup() {
-  // initialize the pushbutton pin as an input:
-  pinMode(homeAddButton, INPUT);
-  pinMode(homeSubButton, INPUT);
-  pinMode(awayAddButton, INPUT);
-  pinMode(awaySubButton, INPUT);
+  // Setup the first button with an internal pull-up :
+  pinMode(BUTTON_PIN_1,INPUT_PULLUP);
+  // After setting up the button, setup the Bounce instance :
+  debouncer1.attach(BUTTON_PIN_1);
+  debouncer1.interval(250); // interval in ms
+
+  pinMode(BUTTON_PIN_2,INPUT_PULLUP);
+  // After setting up the button, setup the Bounce instance :
+  debouncer2.attach(BUTTON_PIN_2);
+  debouncer2.interval(250); // interval in ms
+
+  pinMode(BUTTON_PIN_3,INPUT_PULLUP);
+  // After setting up the button, setup the Bounce instance :
+  debouncer3.attach(BUTTON_PIN_3);
+  debouncer3.interval(250); // interval in ms
+
+  pinMode(BUTTON_PIN_4,INPUT_PULLUP);
+  // After setting up the button, setup the Bounce instance :
+  debouncer4.attach(BUTTON_PIN_4);
+  debouncer4.interval(250); // interval in ms
 
   // initialize display
   matrix.begin();
   matrix.setTextWrap(false); // Allow text to run off right edge
   matrix.setTextSize(1);    // size 1 == 8 pixels high
-  
-  displayScoreBoardScreen();
-  // Update display
-  matrix.swapBuffers(false);
+
+  Serial.begin(9600);
 }
 
 /****************************************
  * Main Program Loop
  ****************************************/
 void loop() {
+  check_switches();
+
+  int currentHomeScore = homeScore;
+  int currentAwayScore = awayScore;
+  
   if (scoreResetPressed()) {
+    Serial.println("reset pressed"); 
     resetScores();
   } else {
     if (homeScored()) {
+      Serial.println("home add"); 
       homeScore = increaseScore(homeScore);
     } else if (homeScoreCorrection()) {
+      Serial.println("home sub"); 
       homeScore = decreaseScore(homeScore);
     } else if (awayScored()) {
+      Serial.println("away add"); 
       awayScore = increaseScore(awayScore);
     } else if (awayScoreCorrection()) {
+      Serial.println("away sub"); 
       awayScore = decreaseScore(awayScore);
     }
   }
+
+  if (currentHomeScore != homeScore || currentAwayScore != awayScore) {
+    updateDisplay = true;
+  }
   
   displayScoreBoardScreen();
-  
   // Update display
   matrix.swapBuffers(false);
+  //textHue += 7;
+  //if(textHue >= 1536) textHue -= 1536;
 }
 
 /****************************************
@@ -103,58 +134,71 @@ bool gameOver() {
  * BUTTONS
  ****************************************/
 bool homeScored() {
-  return buttonPressed(homeAddButton);
+  return debouncer1.fell();
+//  return debouncer1.read() == LOW;
+//  return buttonPressed(homeAddButton);
 }
 
 bool awayScored() {
-  return buttonPressed(awayAddButton);
+  return debouncer2.fell();
+//  return debouncer2.read() == LOW;
+//  return buttonPressed(awayAddButton);
 }
 
 bool homeScoreCorrection() {
-  return buttonPressed(homeSubButton);
+  return debouncer3.fell();
+//  return debouncer3.read() == LOW;
+//  return buttonPressed(homeSubButton);
 }
 
 bool awayScoreCorrection() {
-  return buttonPressed(awaySubButton);
+  return debouncer4.fell();
+//  return debouncer4.read() == LOW;
+//  return buttonPressed(awaySubButton);
 }
 
 bool scoreResetPressed() {
   return homeScoreCorrection() && awayScoreCorrection();
 }
 
-bool buttonPressed(int buttonPin) {
-  return digitalRead(buttonPin) == HIGH;
-}
+//bool buttonPressed(int buttonIndex) {
+//  return justpressed[buttonIndex];
+////  return digitalRead(buttonPin) == HIGH;
+//}
 
 /****************************************
  * Display Related
  ****************************************/
 void displayScoreBoardScreen() {
     // fill the screen with 'black'
-  matrix.fillScreen(0);
+  //matrix.fillScreen(0);
   
-  displayScrollingText();
+  //displayScrollingText();
   
-  if (gameOver()) {
-    blinkScores();
-  } else {
+  //if (gameOver()) {
+  //  blinkScores();
+  //} else {
     displayScores();
-  }
+  //}
+  updateDisplay = false;
 }
 
 void displayScores() {
-  matrix.setCursor(1, 9);   // bottom line
-  matrix.setTextColor(matrix.Color333(0,7,7));
-  // TODO: add 0 prefix to scores if less than 10
-  String homeScoreString = String(homeScore);
-  
+  if (updateDisplay) {
+    matrix.fillRect(0, 0, 32, 16, matrix.Color333(0, 0, 0));
+  }
+  matrix.setCursor(1, 4);   // bottom line
+
+  matrix.setTextColor(matrix.Color333(7,0,0));  
   matrix.print(displayableScore(homeScore));
+  matrix.setTextColor(matrix.Color333(1,1,1));
   matrix.print('v');
+  matrix.setTextColor(matrix.Color333(0,7,0));
   matrix.print(displayableScore(awayScore));
 }
 
 String displayableScore(int score) {
-  String scoreString = String(homeScore);
+  String scoreString = String(score);
   if (scoreString.length() == 1) {
     scoreString = "0" + scoreString;
   }
@@ -169,19 +213,26 @@ void blinkScores() {
 }
 
 void clearScoresDisplay() {
-  matrix.fillRect(0, 8, 32, 16, matrix.Color333(0, 0, 0));
+  matrix.fillRect(0, 4, 32, 10, matrix.Color333(0, 0, 0));
 }
 
 // Scrolls text from right to left with changing colors
-void displayScrollingText() {
-  // Draw big scrolly text on top
-  matrix.setTextColor(matrix.ColorHSV(textHue, 255, 255, true));
-  matrix.setCursor(textX, 0); // top line
-  matrix.print(F2(str));
+//void displayScrollingText() {
+//  // Draw big scrolly text on top
+//  matrix.setTextColor(matrix.ColorHSV(textHue, 255, 255, true));
+//  matrix.setCursor(textX, 0); // top line
+//  matrix.print(F2(str));
+//
+//  // Move text left (w/wrap), increase hue
+//  if((--textX) < textMin) textX = matrix.width();
+//  textHue += 7;
+//  if(textHue >= 1536) textHue -= 1536;
+//}
 
-  // Move text left (w/wrap), increase hue
-  if((--textX) < textMin) textX = matrix.width();
-  textHue += 7;
-  if(textHue >= 1536) textHue -= 1536;
+void check_switches()
+{
+  debouncer1.update();
+  debouncer2.update();
+  debouncer3.update();
+  debouncer4.update();
 }
-
