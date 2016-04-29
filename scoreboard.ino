@@ -97,7 +97,6 @@ void loop() {
   }
   
   displayScoreBoardScreen();
-  // Update display
   matrix.swapBuffers(false);
 }
 
@@ -162,27 +161,28 @@ bool buttonisHeld(Bounce button) {
  * Display Related
  ****************************************/
 void displayScoreBoardScreen() {
-  matrix.drawRect(0, 0, 32, 16, matrix.ColorHSV(hue, 255, 255, true));
-    // fill the screen with 'black'
+  // fill the screen with 'black'
   //matrix.fillScreen(0);
   
-  //displayScrollingText();
-  
-  //if (gameOver()) {
-  //  blinkScores();
-  //} else {
-    displayScores();
-  //}
+  if (gameOver()) {
+    drawGameOverBorder();
+  }
+  displayScores();
+
   updateDisplay = false;
+}
+
+void drawGameOverBorder() {
+  matrix.drawRect(0, 0, 32, 16, matrix.ColorHSV(hue, 255, 255, true));
   hue += 7;
   if(hue >= 1536) hue -= 1536;
 }
 
 void displayScores() {
   if (updateDisplay) {
-    matrix.fillRect(0, 0, 32, 16, matrix.Color333(0, 0, 0));
+    clearDisplay();
   }
-  matrix.setCursor(1, 4);   // bottom line
+  matrix.setCursor(1, 4);
 
   matrix.setTextColor(matrix.Color333(7,0,0));  
   matrix.print(displayableScore(homeScore));
@@ -203,12 +203,12 @@ String displayableScore(int score) {
 void blinkScores() {
   displayScores();
   delay(500);
-  clearScoresDisplay();
+  clearDisplay();
   delay(500);
 }
 
-void clearScoresDisplay() {
-  matrix.fillRect(0, 4, 32, 10, matrix.Color333(0, 0, 0));
+void clearDisplay() {
+  matrix.fillRect(0, 0, 32, 16, matrix.Color333(0, 0, 0));
 }
 
 void updateButtons()
