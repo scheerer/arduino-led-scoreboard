@@ -7,21 +7,22 @@
 
 /////// Hardware setup ////////
 
+
 // Button Pin Setup
-#define BUTTON_PIN_1 10
-#define BUTTON_PIN_2 11
-#define BUTTON_PIN_3 12
-#define BUTTON_PIN_4 13
+#define BUTTON_PIN_1 36
+#define BUTTON_PIN_2 37
+#define BUTTON_PIN_3 38
+#define BUTTON_PIN_4 39
 
 // 16x32 LED Pin Setup
-#define CLK 8  // MUST be on PORTB! (Use pin 11 on Mega)
+#define CLK 11  // MUST be on PORTB! (Use pin 11 on Mega)
 #define LAT A3
 #define OE  9
 #define A   A0
 #define B   A1
 #define C   A2
 // last param indicates 'double buffering'
-RGBmatrixPanel matrix(A, B, C, CLK, LAT, OE, false);
+RGBmatrixPanel matrix(A, B, C, CLK, LAT, OE, true);
 
 const int BUTTON_DEBOUNCE_MS = 150;
 Bounce homeAddButton = Bounce(); 
@@ -78,8 +79,8 @@ void loop() {
     resetScores();
   } else {
     if (homeScored()) {
-      Serial.println("home add"); 
       homeScore = increaseScore(homeScore);
+      Serial.println("home add " + displayableScore(homeScore)); 
     } else if (homeScoreCorrection()) {
       Serial.println("home sub"); 
       homeScore = decreaseScore(homeScore);
@@ -95,7 +96,7 @@ void loop() {
   if (currentHomeScore != homeScore || currentAwayScore != awayScore) {
     updateDisplay = true;
   }
-  
+
   displayScoreBoardScreen();
   matrix.swapBuffers(false);
 }
@@ -162,7 +163,7 @@ bool buttonisHeld(Bounce button) {
  ****************************************/
 void displayScoreBoardScreen() {
   // fill the screen with 'black'
-  //matrix.fillScreen(0);
+  matrix.fillScreen(0);
   
   if (gameOver()) {
     drawGameOverBorder();
