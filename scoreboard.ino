@@ -15,16 +15,16 @@
 #define BUTTON_PIN_4 39
 
 // 16x32 LED Pin Setup
-#define CLK 11  // MUST be on PORTB! (Use pin 11 on Mega)
+#define CLK 50  // MUST be on PORTB! (Use pin 11 on Mega)
 #define LAT A3
-#define OE  9
+#define OE  51
 #define A   A0
 #define B   A1
 #define C   A2
 // last param indicates 'double buffering'
 RGBmatrixPanel matrix(A, B, C, CLK, LAT, OE, true);
 
-const int BUTTON_DEBOUNCE_MS = 150;
+const int BUTTON_DEBOUNCE_MS = 50;
 Bounce homeAddButton = Bounce(); 
 Bounce awayAddButton = Bounce(); 
 Bounce homeSubButton = Bounce(); 
@@ -34,13 +34,23 @@ Bounce awaySubButton = Bounce();
 const int WINNING_SCORE = 21;
 int homeScore = 0;
 int awayScore = 0;
-bool updateDisplay = true;
 int hue = 0;
+
+
+byte combination[] = "1332";
+byte userInput[4];
+
+
+unsigned long currentTime;
 
 /****************************************
  * Program Setup
  ****************************************/
 void setup() {
+  while (!Serial);
+  delay(500);
+  Serial.begin(115200);
+  
   pinMode(BUTTON_PIN_1,INPUT_PULLUP);
   homeAddButton.attach(BUTTON_PIN_1);
   homeAddButton.interval(BUTTON_DEBOUNCE_MS);
@@ -59,42 +69,33 @@ void setup() {
 
   // initialize display
   matrix.begin();
-  matrix.setTextWrap(false); // Allow text to run off right edge
-  matrix.setTextSize(1);    // size 1 == 8 pixels high
 
-  Serial.begin(9600);
+  displayText("Shall We Play A Game?");
 }
 
 /****************************************
  * Main Program Loop
  ****************************************/
 void loop() {
+  currentTime = millis();
+
   updateButtons();
 
   int currentHomeScore = homeScore;
   int currentAwayScore = awayScore;
   
   if (scoreResetPressed()) {
-    Serial.println("reset pressed"); 
     resetScores();
   } else {
     if (homeScored()) {
       homeScore = increaseScore(homeScore);
-      Serial.println("home add " + displayableScore(homeScore)); 
     } else if (homeScoreCorrection()) {
-      Serial.println("home sub"); 
       homeScore = decreaseScore(homeScore);
     } else if (awayScored()) {
-      Serial.println("away add"); 
       awayScore = increaseScore(awayScore);
     } else if (awayScoreCorrection()) {
-      Serial.println("away sub"); 
       awayScore = decreaseScore(awayScore);
     }
-  }
-
-  if (currentHomeScore != homeScore || currentAwayScore != awayScore) {
-    updateDisplay = true;
   }
 
   displayScoreBoardScreen();
@@ -162,15 +163,14 @@ bool buttonisHeld(Bounce button) {
  * Display Related
  ****************************************/
 void displayScoreBoardScreen() {
+  matrix.setTextSize(1);
   // fill the screen with 'black'
-  matrix.fillScreen(0);
+  clearDisplay();
   
   if (gameOver()) {
     drawGameOverBorder();
   }
   displayScores();
-
-  updateDisplay = false;
 }
 
 void drawGameOverBorder() {
@@ -180,9 +180,6 @@ void drawGameOverBorder() {
 }
 
 void displayScores() {
-  if (updateDisplay) {
-    clearDisplay();
-  }
   matrix.setCursor(1, 4);
 
   matrix.setTextColor(matrix.Color333(7,0,0));  
@@ -201,6 +198,27 @@ String displayableScore(int score) {
   return scoreString;
 }
 
+void displayText(String text) {
+  matrix.setTextWrap(false); // Allow text to run off right edge
+  matrix.setTextSize(2);    // size 1 == 8 pixels high
+
+  int textX   = matrix.width();
+  int textMin = text.length() * -12;
+
+  while ((--textX) >= textMin) {
+    //Serial.println("TextX: " + textX);
+    matrix.fillScreen(0);
+    matrix.setTextColor(matrix.ColorHSV(hue, 255, 255, true));
+    matrix.setCursor(textX, 1);
+    matrix.print(text);
+    
+    hue += 7;
+    if(hue >= 1536) hue -= 1536;
+    matrix.swapBuffers(true);
+    delay(10);
+  }
+}
+
 void blinkScores() {
   displayScores();
   delay(500);
@@ -209,7 +227,7 @@ void blinkScores() {
 }
 
 void clearDisplay() {
-  matrix.fillRect(0, 0, 32, 16, matrix.Color333(0, 0, 0));
+  matrix.fillScreen(0);
 }
 
 void updateButtons()
