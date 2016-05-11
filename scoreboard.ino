@@ -16,7 +16,7 @@
 
 // 16x32 LED Pin Setup
 #define CLK 50  // MUST be on PORTB! (Use pin 11 on Mega)
-#define LAT A3
+#define LAT A4
 #define OE  51
 #define A   A0
 #define B   A1
