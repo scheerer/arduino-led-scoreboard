@@ -1,8 +1,8 @@
 #include <Adafruit_GFX.h>   // Core graphics library
 #include <RGBmatrixPanel.h> // Hardware-specific library
-#include <Bounce2.h>        // Button Debouncer
 #include <Arduino.h>
 
+#include "Button.h"
 #include "fontBig.h"
 #include "BluefruitConfig.h"
 
@@ -11,18 +11,19 @@
 
 /////// Hardware setup ////////
 
-// Button Pin Setup
+// Physical Button Pin Setup
 #define BUTTON_PIN_1 36
 #define BUTTON_PIN_2 37
 #define BUTTON_PIN_3 38
 #define BUTTON_PIN_4 39
 
-#define REMOTE_BUTTON_A 7
-#define REMOTE_BUTTON_B 6
-#define REMOTE_BUTTON_C 5
-#define REMOTE_BUTTON_D 4
-#define POWERPIN   3
-#define GROUNDPIN  2
+// RF Button Pin Setup
+#define RF_BUTTON_A  7
+#define RF_BUTTON_B  6
+#define RF_BUTTON_C  5
+#define RF_BUTTON_D  4
+#define RF_POWERPIN  3
+#define RF_GROUNDPIN 2
 
 // 16x32 LED Pin Setup
 #define CLK 50  // MUST be on PORTB! (Use pin 11 on Mega)
@@ -31,32 +32,20 @@
 #define A   A0
 #define B   A1
 #define C   A2
+
+//////// Program variables ////////
 // last param indicates 'double buffering'
 RGBmatrixPanel matrix(A, B, C, CLK, LAT, OE, true);
 
-const int BUTTON_DEBOUNCE_MS = 50;
-Bounce homeAddButton = Bounce(); 
-Bounce awayAddButton = Bounce(); 
-Bounce homeSubButton = Bounce(); 
-Bounce awaySubButton = Bounce();
-
-Bounce remoteHomeAddButton = Bounce(); 
-Bounce remoteAwayAddButton = Bounce(); 
-Bounce remoteHomeSubButton = Bounce(); 
-Bounce remoteAwaySubButton = Bounce();
-
-// Program variables       
+Button homeAddButton = Button(BUTTON_PIN_1, RF_BUTTON_A); 
+Button awayAddButton = Button(BUTTON_PIN_2, RF_BUTTON_B); 
+Button homeSubButton = Button(BUTTON_PIN_3, RF_BUTTON_C); 
+Button awaySubButton = Button(BUTTON_PIN_4, RF_BUTTON_D);
+       
 const int WINNING_SCORE = 21;
 int homeScore = 0;
 int awayScore = 0;
 int hue = 0;
-
-
-byte combination[] = "1332";
-byte userInput[4];
-
-
-unsigned long currentTime;
 
 /****************************************
  * Program Setup
@@ -66,79 +55,57 @@ void setup() {
   delay(500);
   Serial.begin(19200);
   
-  pinMode(BUTTON_PIN_1,INPUT_PULLUP);
-  homeAddButton.attach(BUTTON_PIN_1);
-  homeAddButton.interval(BUTTON_DEBOUNCE_MS);
-
-  pinMode(BUTTON_PIN_2,INPUT_PULLUP);
-  awayAddButton.attach(BUTTON_PIN_2);
-  awayAddButton.interval(BUTTON_DEBOUNCE_MS);
-
-  pinMode(BUTTON_PIN_3,INPUT_PULLUP);
-  homeSubButton.attach(BUTTON_PIN_3);
-  homeSubButton.interval(BUTTON_DEBOUNCE_MS);
-
-  pinMode(BUTTON_PIN_4,INPUT_PULLUP);
-  awaySubButton.attach(BUTTON_PIN_4);
-  awaySubButton.interval(BUTTON_DEBOUNCE_MS);
-
-
   // Set the ground pin to a Low output
-  pinMode(GROUNDPIN, OUTPUT);
-  digitalWrite(GROUNDPIN, LOW);
+  pinMode(RF_GROUNDPIN, OUTPUT);
+  digitalWrite(RF_GROUNDPIN, LOW);
    
   // Set the +5v pin to a High output
-  pinMode(POWERPIN,OUTPUT);
-  digitalWrite(POWERPIN, HIGH);
+  pinMode(RF_POWERPIN, OUTPUT);
+  digitalWrite(RF_POWERPIN, HIGH);
 
-  pinMode(REMOTE_BUTTON_A, INPUT);
-  remoteHomeAddButton.attach(REMOTE_BUTTON_A);
-  remoteHomeAddButton.interval(0);
-  pinMode(REMOTE_BUTTON_B, INPUT);
-  remoteAwayAddButton.attach(REMOTE_BUTTON_B);
-  remoteAwayAddButton.interval(0);
-  pinMode(REMOTE_BUTTON_C, INPUT);
-  remoteHomeSubButton.attach(REMOTE_BUTTON_C);
-  remoteHomeSubButton.interval(0);
-  pinMode(REMOTE_BUTTON_D, INPUT);
-  remoteAwaySubButton.attach(REMOTE_BUTTON_D);
-  remoteAwaySubButton.interval(0);
+  // initialize buttons
+  homeAddButton.init();
+  awayAddButton.init();
+  homeSubButton.init();
+  awaySubButton.init();
   
   // initialize display
   matrix.begin();
-
-  displayText("Shall We Play A Game?");
+  displayText("#Cornholio");
+  serialPrintScores();
 }
 
 /****************************************
  * Main Program Loop
  ****************************************/
 void loop() {
-  currentTime = millis();
-
-  updateButtons();
-
   int currentHomeScore = homeScore;
   int currentAwayScore = awayScore;
   
+  updateButtons();
+
   if (scoreResetPressed()) {
+    Serial.println("Reset scores");
     resetScores();
   } else {
-    if (homeScored()) {
+    if (homeAddButton.justPressed()) {
       homeScore = increaseScore(homeScore);
-      Serial.println("Home scored: " + displayableScore(homeScore) + " v " + displayableScore(awayScore));
-    } else if (homeScoreCorrection()) {
+    } else if (homeSubButton.justPressed()) {
       homeScore = decreaseScore(homeScore);
-      Serial.println("Home sub: " +  displayableScore(homeScore) + " v " + displayableScore(awayScore));
-    } else if (awayScored()) {
+    } else if (awayAddButton.justPressed()) {
       awayScore = increaseScore(awayScore);
-      Serial.println("Away scored: " + displayableScore(homeScore) + " v " + displayableScore(awayScore));
-    } else if (awayScoreCorrection()) {
+    } else if (awaySubButton.justPressed()) {
       awayScore = decreaseScore(awayScore);
-      Serial.println("Away sub: " + displayableScore(homeScore) + " v " + displayableScore(awayScore));
     }
   }
 
+  if (currentHomeScore != homeScore || currentAwayScore != awayScore) {
+    serialPrintScores();
+    if (gameOver()) {
+      Serial.println("Winner, winner, chicken dinner!");
+    }
+  }
+  
   displayScoreBoardScreen();
   matrix.swapBuffers(false);
 }
@@ -169,35 +136,12 @@ bool gameOver() {
   return homeScore == WINNING_SCORE || awayScore == WINNING_SCORE;
 }
 
-/****************************************
- * BUTTONS
- ****************************************/
-bool homeScored() {
-  return buttonJustPressed(homeAddButton) || remoteHomeAddButton.rose();
-}
-
-bool awayScored() {
-  return buttonJustPressed(awayAddButton) || remoteAwayAddButton.rose();
-}
-
-bool homeScoreCorrection() {
-  return buttonJustPressed(homeSubButton) || remoteHomeSubButton.rose();
-}
-
-bool awayScoreCorrection() {
-  return buttonJustPressed(awaySubButton) || remoteAwaySubButton.rose();
-}
-
 bool scoreResetPressed() {
-  return buttonisHeld(homeSubButton) && buttonisHeld(awaySubButton);
+  return homeSubButton.isHeld() && awaySubButton.isHeld();
 }
 
-bool buttonJustPressed(Bounce button) {
-  return button.fell();
-}
-
-bool buttonisHeld(Bounce button) {
-  return button.read() == LOW;
+void serialPrintScores() {
+  Serial.println("Current scores: " + displayableScore(homeScore) + " v " + displayableScore(awayScore));
 }
 
 /****************************************
@@ -221,15 +165,15 @@ void drawGameOverBorder() {
 }
 
 void displayScores() {
-  putDigitLarge(0, 2, '0' + homeScore / 10, 0, 0, 7);
-  putDigitLarge(6, 2, '0' + homeScore % 10, 0, 0, 7);
+  putDigitLarge(1, 2, '0' + homeScore / 10, 7, 0, 0);
+  putDigitLarge(7, 2, '0' + homeScore % 10, 7, 0, 0);
 
-  matrix.setCursor(13, 4);
+  matrix.setCursor(14, 4);
   matrix.setTextColor(matrix.Color333(1,1,1));
   matrix.print('v');
 
-  putDigitLarge(18, 2, '0' + awayScore / 10, 0, 7, 0);
-  putDigitLarge(24, 2, '0' + awayScore % 10, 0, 7, 0);
+  putDigitLarge(19, 2, '0' + awayScore / 10, 0, 7, 0);
+  putDigitLarge(25, 2, '0' + awayScore % 10, 0, 7, 0);
 }
 
 String displayableScore(int score) {
@@ -278,11 +222,6 @@ void updateButtons()
   awayAddButton.update();
   homeSubButton.update();
   awaySubButton.update();
-
-  remoteHomeAddButton.update();
-  remoteAwayAddButton.update();
-  remoteHomeSubButton.update();
-  remoteAwaySubButton.update();
 }
 
 void putDigitLarge(uint8_t x, uint8_t y, char c, uint8_t r, uint8_t g, uint8_t b)
