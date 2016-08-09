@@ -26,8 +26,8 @@
 #define RF_GROUNDPIN 2
 
 // 16x32 LED Pin Setup
-#define CLK 50  // MUST be on PORTB! (Use pin 11 on Mega)
-#define LAT A4
+#define CLK 50
+#define LAT A3
 #define OE  51
 #define A   A0
 #define B   A1
@@ -45,6 +45,13 @@ Button awaySubButton = Button(BUTTON_PIN_4, RF_BUTTON_D);
 const int WINNING_SCORE = 21;
 int homeScore = 0;
 int awayScore = 0;
+
+// Last scored var and constants
+const int NO_SCORE = 0;
+const int HOME_SCORED = 1;
+const int AWAY_SCORED = 2;
+int lastScored = NO_SCORE;
+
 int hue = 0;
 
 /****************************************
@@ -71,7 +78,7 @@ void setup() {
   
   // initialize display
   matrix.begin();
-  displayText("#Cornholio");
+  displayText("#TimeToPlay");
   serialPrintScores();
 }
 
@@ -87,13 +94,16 @@ void loop() {
   if (scoreResetPressed()) {
     Serial.println("Reset scores");
     resetScores();
+    lastScored = NO_SCORE;
   } else {
     if (homeAddButton.justPressed()) {
       homeScore = increaseScore(homeScore);
+      lastScored = HOME_SCORED;
     } else if (homeSubButton.justPressed()) {
       homeScore = decreaseScore(homeScore);
     } else if (awayAddButton.justPressed()) {
       awayScore = increaseScore(awayScore);
+      lastScored = AWAY_SCORED;
     } else if (awaySubButton.justPressed()) {
       awayScore = decreaseScore(awayScore);
     }
@@ -168,9 +178,24 @@ void displayScores() {
   putDigitLarge(1, 2, '0' + homeScore / 10, 7, 0, 0);
   putDigitLarge(7, 2, '0' + homeScore % 10, 7, 0, 0);
 
-  matrix.setCursor(14, 4);
-  matrix.setTextColor(matrix.Color333(1,1,1));
-  matrix.print('v');
+  uint16_t indicatorColor = matrix.Color333(7,6,0);
+  if (lastScored == NO_SCORE) {
+    matrix.setCursor(14, 4);
+    matrix.setTextColor(indicatorColor);
+    matrix.print('v');
+  } else if (lastScored == HOME_SCORED) {
+    // Draw a < pointing towards home score
+    matrix.drawLine(14, 7, 17, 4, indicatorColor);
+    matrix.drawLine(14, 8, 17, 5, indicatorColor);
+    matrix.drawLine(14, 8, 17, 11, indicatorColor);
+    matrix.drawLine(14, 7, 17, 10, indicatorColor);
+  } else if (lastScored == AWAY_SCORED) {
+    // Draw a > pointing towards away score
+    matrix.drawLine(15, 4, 18, 7, indicatorColor);
+    matrix.drawLine(15, 5, 18, 8, indicatorColor);
+    matrix.drawLine(15, 11, 18, 8, indicatorColor);
+    matrix.drawLine(15, 10, 18, 7, indicatorColor);
+  }
 
   putDigitLarge(19, 2, '0' + awayScore / 10, 0, 7, 0);
   putDigitLarge(25, 2, '0' + awayScore % 10, 0, 7, 0);
@@ -203,13 +228,6 @@ void displayText(String text) {
     matrix.swapBuffers(true);
     delay(10);
   }
-}
-
-void blinkScores() {
-  displayScores();
-  delay(500);
-  clearDisplay();
-  delay(500);
 }
 
 void clearDisplay() {
