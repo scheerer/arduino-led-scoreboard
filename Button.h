@@ -4,6 +4,7 @@
 #include "Arduino.h"
 #include "Bounce2.h" // Button Debouncer
 
+// Wraps a physical button pin using the built in INPUT_PULLUP and an optional RF input
 class Button {
   public:
     Button(uint8_t physicalPin);

@@ -4,7 +4,6 @@
 
 #include "Button.h"
 #include "fontBig.h"
-#include "BluefruitConfig.h"
 
 // Similar to F(), but for PROGMEM string pointers rather than literals
 #define F2(progmem_ptr) (const __FlashStringHelper *)progmem_ptr

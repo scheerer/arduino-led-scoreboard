@@ -2,17 +2,13 @@
 #define FONTBIG_H_INCLUDED
 
 
-
-
 /***********************************************************************
  * fontBig.h - digits defined in 6x12 grid;
  *           - used for displaying the time on 24x16 display of Wise Clock 2;
  * Copyright Aug 1/2010, by FlorinC;
  *   Copyrighted and distributed under the terms of the Berkeley license
  *   (copy freely, but include this notice of original author.)
- ***********************************************************************
- */
-
+ ************************************************************************/
 
 //*********************************************************************************************************
 //*  Edit History, started April, 2010
